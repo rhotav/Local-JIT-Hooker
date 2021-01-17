@@ -32,16 +32,16 @@ namespace JIT_Example
             var vTable = getJit(); //ICorJitCompiler pointer'ı alındı
             var compileMethodPtr = Marshal.ReadIntPtr(vTable); //İçerisindeki ilk pointer okundu.
             OrigCompileMethod = (Context.delCompileMethod)Marshal.GetDelegateForFunctionPointer(Marshal.ReadIntPtr(compileMethodPtr), typeof(Context.delCompileMethod)); //Orjinal compileMethod fonksiyonu Delegate türünde yüklendi.
-            //Bizim iznimizde tekrardan çalıştırmak istersek orjinal fonksiyonu yerine koymak zorunda olduğumuz için
+                                                                                                                                                                         //Bizim iznimizde tekrardan çalıştırmak istersek orjinal fonksiyonu yerine koymak zorunda olduğumuz için
             if (!VirtualProtect(compileMethodPtr, (uint)IntPtr.Size, 0x40, out old)) //VirtualProtect ile bölgenin izinleri execute read write izni olarak değiştirildi
-                    return;
+                return;
 
             RuntimeHelpers.PrepareDelegate(hookedCompileMethod);//Belirtilen temsilcinin kısıtlanmış bir yürütme bölgesine (CER) eklenmek üzere hazırlanması gerektiğini gösterir.
             RuntimeHelpers.PrepareDelegate(OrigCompileMethod);
             //Bunları koymadan çalıştırırsanız göreceksiniz ki program stackoverflow exception'a düşecek. Sonsuz döngüye girmemesi için koyuyoruz.
             Marshal.WriteIntPtr(compileMethodPtr, Marshal.GetFunctionPointerForDelegate(hookedCompileMethod)); //Fake fonksiyonumuzun adresini alıp compileMethod pointer'ının yerine yazdırdık.
             VirtualProtect(compileMethodPtr, (uint)IntPtr.Size,
-                old, out old);//İzinleri eski haline döndürüyoruz.
+        old, out old);//İzinleri eski haline döndürüyoruz.
 
             Console.WriteLine(testFunc()); //Bakalım çalışıyor mu
 
@@ -60,21 +60,21 @@ namespace JIT_Example
         }
 
         private static unsafe int HookedCompileMethod(IntPtr thisPtr, [In] IntPtr corJitInfo,
- [In] Context.CorMethodInfo* methodInfo, Context.CorJitFlag flags,
-[Out] IntPtr nativeEntry, [Out] IntPtr nativeSizeOfCode)
+         [In] Context.CorMethodInfo* methodInfo, Context.CorJitFlag flags,
+        [Out] IntPtr nativeEntry, [Out] IntPtr nativeSizeOfCode)
         {
             int token;
             Console.WriteLine("Compilation:\r\n");
-            Console.WriteLine("Token: " + (token = (0x06000000 + *(ushort*)methodInfo->methodHandle)).ToString("x8"));
+            Console.WriteLine("Token: " + (token = (0x06000000 + *(ushort*)methodInfo->methodHandle)).ToString("x8"));//Token hesaplaması. dnSpy üzerinden tekrardan teyit edersek doğru olduğunu göreceğiz.
             Console.WriteLine("Name: " + typeof(Program).Module.ResolveMethod(token).Name);
             Console.WriteLine("Body size: " + methodInfo->ilCodeSize);
 
-            var bodyBuffer = new byte[methodInfo->ilCodeSize];
-            Marshal.Copy(methodInfo->ilCode, bodyBuffer, 0, bodyBuffer.Length);
+            var bodyBuffer = new byte[methodInfo->ilCodeSize]; //ilCodeSize tam da burda işimize yarıyor. ne kadar byte allocate edeceğimizi ona göre seçiyoruz.
+            Marshal.Copy(methodInfo->ilCode, bodyBuffer, 0, bodyBuffer.Length); //ilCode yapısını değişkenimize yazdırıyoruz.
 
             Console.WriteLine("Body: " + BitConverter.ToString(bodyBuffer));
 
-            return OrigCompileMethod(thisPtr, corJitInfo, methodInfo, flags, nativeEntry, nativeSizeOfCode);
+            return OrigCompileMethod(thisPtr, corJitInfo, methodInfo, flags, nativeEntry, nativeSizeOfCode); //Asıl fonksiyonu çalıştırıyoruz.
         }
 
     }
